@@ -11,6 +11,7 @@
         .custom-scrollbar::-webkit-scrollbar { height: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         
+        /* Custom File Input Styling */
         .file-input-wrapper input[type="file"] { display: none; }
         .file-custom-btn {
             display: inline-block;
@@ -170,19 +171,36 @@
 
             <div class="space-y-6">
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h3 class="text-lg font-bold text-gray-800 mb-4">⏰ Upcoming Bills</h3>
-                    <div class="space-y-3 mb-4">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-file-invoice-dollar text-blue-600"></i> Upcoming Bills
+                    </h3>
+                    <div class="space-y-3 mb-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                         {% for r in reminders %}
-                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
-                            <div><p class="font-bold text-sm">{{ r.title }}</p><p class="text-[10px] text-gray-500">{{ r.due_date }}</p></div>
-                            <div class="text-right"><span class="font-bold text-red-500 block">₹{{ r.amount }}</span><button onclick="deleteReminder('{{ r.id }}')" class="text-[10px] text-gray-400 hover:text-red-500">Mark Paid</button></div>
+                        <div class="flex justify-between items-center p-3 rounded-lg border {% if r.is_paid %}bg-gray-50 border-gray-100 opacity-60{% else %}bg-white border-blue-50 shadow-sm{% endif %}">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <p class="font-bold text-sm {% if r.is_paid %}line-through text-gray-400{% endif %}">{{ r.title }}</p>
+                                    {% if not r.is_paid %}
+                                        <span class="text-[8px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-black uppercase tracking-tighter">Due</span>
+                                    {% endif %}
+                                </div>
+                                <p class="text-[10px] text-gray-500"><i class="far fa-clock"></i> {{ r.due_date }}</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-bold text-sm {% if r.is_paid %}text-gray-400{% else %}text-red-500{% endif %}">₹{{ r.amount }}</span>
+                                {% if not r.is_paid %}
+                                    <button onclick="markAsPaid('{{ r.id }}')" class="block w-full text-[10px] text-blue-600 font-bold hover:underline">Mark Paid</button>
+                                {% else %}
+                                    <span class="block text-[10px] text-green-600 font-bold italic"><i class="fas fa-check-circle"></i> Paid</span>
+                                {% endif %}
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
                     <form onsubmit="addReminder(event)" class="border-t pt-4 space-y-2">
                         <input type="text" id="remTitle" placeholder="Bill Title" required class="w-full text-xs border rounded p-2">
                         <div class="flex gap-2"><input type="number" id="remAmount" placeholder="Amount" required class="w-1/2 text-xs border rounded p-2"><input type="date" id="remDate" required class="w-1/2 text-xs border rounded p-2"></div>
-                        <button type="submit" class="w-full bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-black">+ Add</button>
+                        <button type="submit" class="w-full bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-black transition">+ Add</button>
                     </form>
                 </div>
             </div>
@@ -305,7 +323,20 @@
         window.location.reload();
     }
 
+    async function markAsPaid(id) {
+        const fd = new FormData();
+        fd.append("rem_id", id);
+        fd.append("status", "true");
+        try {
+            await fetch("/api/update_reminder_status", { method: "POST", body: fd });
+            window.location.reload();
+        } catch (e) {
+            alert("Failed to update bill status.");
+        }
+    }
+
     async function deleteReminder(id) {
+        if(!confirm("Are you sure you want to delete this bill?")) return;
         const fd = new FormData(); fd.append("rem_id", id);
         await fetch("/api/delete_reminder", { method: "POST", body: fd });
         window.location.reload();
@@ -313,65 +344,30 @@
 
     let expenseChart = null; let incomeChart = null;
     async function loadChart() {
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const m = urlParams.get('month') || 0;
-        const y = urlParams.get('year') || new Date().getFullYear();
-        
-        const res = await fetch(`/api/analytics?month=${m}&year=${y}`);
-        const data = await res.json();
-        
-        const ctxExp = document.getElementById('expenseChart').getContext('2d');
-        const ctxInc = document.getElementById('incomeChart').getContext('2d');
-        
-        if (expenseChart) expenseChart.destroy(); 
-        if (incomeChart) incomeChart.destroy();
-
-        // --- NEW: Data Validation Logic ---
-        const hasExpenses = data.expenses && data.expenses.values && data.expenses.values.length > 0;
-        const hasIncomes = data.incomes && data.incomes.values && data.incomes.values.length > 0;
-
-        const options = { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            plugins: { legend: { position: 'bottom' } } 
-        };
-
-        if (!hasExpenses && !hasIncomes) {
-            // Optional: You could show a "No Data" alert or placeholder here
-            console.warn("No data found for the selected period.");
-        }
-
-        // Render Expense Chart (or empty state)
-        expenseChart = new Chart(ctxExp, { 
-            type: 'doughnut', 
-            data: { 
-                labels: hasExpenses ? data.expenses.labels : ["No Data Available"], 
-                datasets: [{ 
-                    data: hasExpenses ? data.expenses.values : [1], 
-                    backgroundColor: hasExpenses ? ['#ef4444', '#f97316', '#f59e0b', '#eab308'] : ['#f3f4f6'] 
-                }] 
-            }, 
-            options: options 
-        });
-
-        // Render Income Chart (or empty state)
-        incomeChart = new Chart(ctxInc, { 
-            type: 'doughnut', 
-            data: { 
-                labels: hasIncomes ? data.incomes.labels : ["No Data Available"], 
-                datasets: [{ 
-                    data: hasIncomes ? data.incomes.values : [1], 
-                    backgroundColor: hasIncomes ? ['#10b981', '#14b8a6', '#06b6d4', '#0ea5e9'] : ['#f3f4f6'] 
-                }] 
-            }, 
-            options: options 
-        });
-
-    } catch (e) {
-        console.error("Chart Error:", e);
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const m = urlParams.get('month') || 0;
+            const y = urlParams.get('year') || new Date().getFullYear();
+            const res = await fetch(`/api/analytics?month=${m}&year=${y}`);
+            const data = await res.json();
+            const ctxExp = document.getElementById('expenseChart').getContext('2d');
+            const ctxInc = document.getElementById('incomeChart').getContext('2d');
+            if (expenseChart) expenseChart.destroy(); if (incomeChart) incomeChart.destroy();
+            const hasExpenses = data.expenses && data.expenses.values && data.expenses.values.length > 0;
+            const hasIncomes = data.incomes && data.incomes.values && data.incomes.values.length > 0;
+            const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } };
+            expenseChart = new Chart(ctxExp, { 
+                type: 'doughnut', 
+                data: { labels: hasExpenses ? data.expenses.labels : ["No Data Available"], datasets: [{ data: hasExpenses ? data.expenses.values : [1], backgroundColor: hasExpenses ? ['#ef4444', '#f97316', '#f59e0b', '#eab308'] : ['#f3f4f6'] }] }, 
+                options: options 
+            });
+            incomeChart = new Chart(ctxInc, { 
+                type: 'doughnut', 
+                data: { labels: hasIncomes ? data.incomes.labels : ["No Data Available"], datasets: [{ data: hasIncomes ? data.incomes.values : [1], backgroundColor: hasIncomes ? ['#10b981', '#14b8a6', '#06b6d4', '#0ea5e9'] : ['#f3f4f6'] }] }, 
+                options: options 
+            });
+        } catch (e) { console.error("Chart Error:", e); }
     }
-}
 </script>
 </body>
 </html>
