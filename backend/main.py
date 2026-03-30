@@ -208,6 +208,34 @@ def bot_bind_user(email: str = Form(...), telegram_id: str = Form(...), db: Sess
     db.commit()
     return {"status": "bound", "email": clean_email}
 
+
+@app.post("/api/add_reminder")
+def api_add_reminder(
+    title: str = Form(...), 
+    amount: float = Form(...), 
+    due_date: str = Form(...), 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """Creates a new bill reminder for the current user."""
+    db.add(Reminder(
+        user_id=current_user.id, 
+        title=title, 
+        amount=amount, 
+        due_date=due_date,
+        is_paid=False  # Default to unpaid
+    ))
+    db.commit()
+    return {"status": "success"}
+    
+@app.post("/api/update_reminder_status")
+def update_reminder_status(rem_id: int = Form(...), status: bool = Form(...), db: Session = Depends(get_db)):
+    reminder = db.query(Reminder).filter(Reminder.id == rem_id).first()
+    if reminder:
+        reminder.is_paid = status
+        db.commit()
+    return {"status": "updated"}
+
 # --- EXECUTION ---
 if __name__ == "__main__":
     print("🌐 [System] Launching Unified SmartSpend Server...")
