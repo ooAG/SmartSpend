@@ -26,4 +26,5 @@ class Reminder(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     title = Column(String)
     amount = Column(Float)
-    due_date = Column(String) # Storing as string for simplicity (e.g., "2024-12-01")
+    due_date = Column(String) # Storing as string for simplicity (e.g., "2024-12-01"
+    is_paid = Column(Boolean, default=False)
