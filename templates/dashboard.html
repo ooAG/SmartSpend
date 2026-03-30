@@ -314,14 +314,46 @@
     }
 
     async function addReminder(event) {
-        event.preventDefault();
-        const fd = new FormData();
-        fd.append("title", document.getElementById('remTitle').value);
-        fd.append("amount", document.getElementById('remAmount').value);
-        fd.append("due_date", document.getElementById('remDate').value);
-        await fetch("/api/add_reminder", { method: "POST", body: fd });
-        window.location.reload();
+    event.preventDefault();
+    
+    const title = document.getElementById('remTitle').value;
+    const amount = document.getElementById('remAmount').value;
+    const dueDateInput = document.getElementById('remDate').value;
+    
+    // 1. Check if the date is valid and in the future
+    const selectedDate = new Date(dueDateInput);
+    const today = new Date();
+    // Set time to midnight to compare only dates
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(selectedDate.getTime())) {
+        alert("Please enter a valid date.");
+        return;
     }
+
+    if (selectedDate <= today) {
+        alert("Bill due date must be a future date (tomorrow or later).");
+        return;
+    }
+
+    // 2. Proceed with API call if validation passes
+    const fd = new FormData();
+    fd.append("title", title);
+    fd.append("amount", amount);
+    fd.append("due_date", dueDateInput);
+    
+    try {
+        const res = await fetch("/api/add_reminder", { method: "POST", body: fd });
+        if (res.ok) {
+            window.location.reload(); 
+        } else {
+            alert("Failed to add bill. Check server logs.");
+        }
+    } catch (e) {
+        console.error("Error adding reminder:", e);
+        alert("Network error. Could not connect to the server.");
+    }
+}
 
     async function markAsPaid(id) {
         const fd = new FormData();
