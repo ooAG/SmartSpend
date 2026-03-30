@@ -236,6 +236,21 @@ def update_reminder_status(rem_id: int = Form(...), status: bool = Form(...), db
         db.commit()
     return {"status": "updated"}
 
+@app.post("/api/delete_reminder")
+def api_delete_reminder(
+    rem_id: int = Form(...), 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """Permanently deletes a specific bill reminder for the current user."""
+    db.query(Reminder).filter(
+        Reminder.id == rem_id, 
+        Reminder.user_id == current_user.id
+    ).delete()
+    
+    db.commit()
+    return {"status": "deleted"}
+
 # --- EXECUTION ---
 if __name__ == "__main__":
     print("🌐 [System] Launching Unified SmartSpend Server...")
