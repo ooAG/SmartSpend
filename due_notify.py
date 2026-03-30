@@ -39,7 +39,7 @@ def send_alert(recipient_email, bill_details):
         print(f"❌ Error sending email: {e}")
 
 # Database connection
-db_path = "/home/ubuntu/SmartSpend/test.db" [cite: 1]
+db_path = "/home/ubuntu/SmartSpend/test.db"
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
