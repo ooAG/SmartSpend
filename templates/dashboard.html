@@ -26,6 +26,42 @@
             transition: all 0.2s;
         }
         .file-custom-btn:hover { background: #dbeafe; }
+        /* Custom Calendar & File Styling */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    background: transparent;
+    bottom: 0;
+    color: transparent;
+    cursor: pointer;
+    height: auto;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: auto;
+}
+
+input[type="date"] {
+    position: relative;
+    padding-left: 40px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%233b82f6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='Length 8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    background-size: 20px;
+}
+
+.file-input-wrapper input[type="file"] { display: none; }
+.file-custom-btn {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid #dbeafe;
+    transition: all 0.2s;
+}
     </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex flex-col">
@@ -316,27 +352,33 @@
     async function addReminder(event) {
     event.preventDefault();
     
-    const title = document.getElementById('remTitle').value;
-    const amount = document.getElementById('remAmount').value;
+    const title = document.getElementById('remTitle').value.trim();
+    const amountInput = document.getElementById('remAmount').value;
     const dueDateInput = document.getElementById('remDate').value;
     
-    // 1. Check if the date is valid and in the future
+    // 1. Amount Validation
+    const amount = parseFloat(amountInput);
+    if (isNaN(amount) || amount <= 0) {
+        alert("Please enter a valid amount greater than zero.");
+        return;
+    }
+
+    // 2. Date Validation (Future Date Only)
     const selectedDate = new Date(dueDateInput);
     const today = new Date();
-    // Set time to midnight to compare only dates
-    today.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
 
     if (isNaN(selectedDate.getTime())) {
-        alert("Please enter a valid date.");
+        alert("Please select a valid date.");
         return;
     }
 
     if (selectedDate <= today) {
-        alert("Bill due date must be a future date (tomorrow or later).");
+        alert("Bill due date must be a future date (tomorrow onwards).");
         return;
     }
 
-    // 2. Proceed with API call if validation passes
+    // 3. API Submission
     const fd = new FormData();
     fd.append("title", title);
     fd.append("amount", amount);
@@ -347,11 +389,12 @@
         if (res.ok) {
             window.location.reload(); 
         } else {
-            alert("Failed to add bill. Check server logs.");
+            const errData = await res.json();
+            alert("Error: " + (errData.detail || "Failed to add bill."));
         }
     } catch (e) {
-        console.error("Error adding reminder:", e);
-        alert("Network error. Could not connect to the server.");
+        console.error("Submission error:", e);
+        alert("Network error. Please check your connection to the server.");
     }
 }
 
