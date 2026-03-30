@@ -313,39 +313,65 @@
 
     let expenseChart = null; let incomeChart = null;
     async function loadChart() {
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const m = urlParams.get('month') || 0;
-            const y = urlParams.get('year') || new Date().getFullYear();
-            const res = await fetch(`/api/analytics?month=${m}&year=${y}`);
-            const data = await res.json();
-            
-            const ctxExp = document.getElementById('expenseChart').getContext('2d');
-            const ctxInc = document.getElementById('incomeChart').getContext('2d');
-            
-            if (expenseChart) expenseChart.destroy(); 
-            if (incomeChart) incomeChart.destroy();
-            
-            // Critical options for responsive chart scaling
-            const options = { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                plugins: { legend: { position: 'bottom' } } 
-            };
-            
-            expenseChart = new Chart(ctxExp, { 
-                type: 'doughnut', 
-                data: { labels: data.expenses.labels, datasets: [{ data: data.expenses.values, backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#eab308'] }] }, 
-                options: options 
-            });
-            
-            incomeChart = new Chart(ctxInc, { 
-                type: 'doughnut', 
-                data: { labels: data.incomes.labels, datasets: [{ data: data.incomes.values, backgroundColor: ['#10b981', '#14b8a6', '#06b6d4', '#0ea5e9'] }] }, 
-                options: options 
-            });
-        } catch (e) { console.error("Chart Error:", e); }
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const m = urlParams.get('month') || 0;
+        const y = urlParams.get('year') || new Date().getFullYear();
+        
+        const res = await fetch(`/api/analytics?month=${m}&year=${y}`);
+        const data = await res.json();
+        
+        const ctxExp = document.getElementById('expenseChart').getContext('2d');
+        const ctxInc = document.getElementById('incomeChart').getContext('2d');
+        
+        if (expenseChart) expenseChart.destroy(); 
+        if (incomeChart) incomeChart.destroy();
+
+        // --- NEW: Data Validation Logic ---
+        const hasExpenses = data.expenses && data.expenses.values && data.expenses.values.length > 0;
+        const hasIncomes = data.incomes && data.incomes.values && data.incomes.values.length > 0;
+
+        const options = { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { position: 'bottom' } } 
+        };
+
+        if (!hasExpenses && !hasIncomes) {
+            // Optional: You could show a "No Data" alert or placeholder here
+            console.warn("No data found for the selected period.");
+        }
+
+        // Render Expense Chart (or empty state)
+        expenseChart = new Chart(ctxExp, { 
+            type: 'doughnut', 
+            data: { 
+                labels: hasExpenses ? data.expenses.labels : ["No Data Available"], 
+                datasets: [{ 
+                    data: hasExpenses ? data.expenses.values : [1], 
+                    backgroundColor: hasExpenses ? ['#ef4444', '#f97316', '#f59e0b', '#eab308'] : ['#f3f4f6'] 
+                }] 
+            }, 
+            options: options 
+        });
+
+        // Render Income Chart (or empty state)
+        incomeChart = new Chart(ctxInc, { 
+            type: 'doughnut', 
+            data: { 
+                labels: hasIncomes ? data.incomes.labels : ["No Data Available"], 
+                datasets: [{ 
+                    data: hasIncomes ? data.incomes.values : [1], 
+                    backgroundColor: hasIncomes ? ['#10b981', '#14b8a6', '#06b6d4', '#0ea5e9'] : ['#f3f4f6'] 
+                }] 
+            }, 
+            options: options 
+        });
+
+    } catch (e) {
+        console.error("Chart Error:", e);
     }
+}
 </script>
 </body>
 </html>
