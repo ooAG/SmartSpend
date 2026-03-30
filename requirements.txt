@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+jinja2
+python-multipart
+python-telegram-bot
+python-dotenv
+aiosmtplib
+python-jose
+passlib[bcrypt]
+PyJWT
+openpyxl 
+xlrd
+httpx

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Login - SmartSpend</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 h-screen flex flex-col">
+
+    <nav class="bg-blue-700 p-4 shadow-md">
+        <div class="max-w-4xl mx-auto flex justify-between items-center text-white">
+            <h1 class="text-xl font-bold">💳 SmartSpend Tracker</h1>
+            <span class="text-sm opacity-80">Login</span>
+        </div>
+    </nav>
+
+    <div class="flex-grow flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-md overflow-hidden p-8 max-w-sm w-full">
+            <h2 class="text-2xl font-bold text-gray-900 mb-2 text-center">Welcome Back</h2>
+            <p class="text-sm text-gray-500 mb-6 text-center">Enter your email to receive a secure OTP.</p>
+
+            <form id="requestForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email Address</label>
+                    <input type="email" id="emailInput" placeholder="you@example.com" required 
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm border p-2 focus:ring-blue-500 outline-none">
+                </div>
+                <button type="button" onclick="sendOTP()" class="w-full bg-gray-800 text-white p-2 rounded-md hover:bg-gray-900 transition shadow-sm">Send OTP</button>
+            </form>
+            
+            <p id="statusMessage" class="text-sm font-medium mt-3 text-center h-5"></p>
+
+            <div class="relative flex py-5 items-center">
+                <div class="flex-grow border-t border-gray-200"></div>
+                <span class="flex-shrink-0 mx-4 text-gray-400 text-xs font-bold">THEN</span>
+                <div class="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <form action="/verify-otp" method="post" class="space-y-4">
+                <input type="hidden" id="hiddenEmail" name="email">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Secure Code</label>
+                    <input type="text" name="otp" placeholder="Enter 6-digit OTP" required 
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm border p-2 focus:ring-blue-500 text-center tracking-widest text-lg outline-none">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition shadow-md font-bold">Login securely</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        async function sendOTP() {
+            const email = document.getElementById('emailInput').value;
+            const statusText = document.getElementById('statusMessage');
+            if (!email) return alert("Please enter an email first!");
+
+            document.getElementById('hiddenEmail').value = email;
+            statusText.innerText = "Sending OTP...";
+            statusText.className = "text-sm font-medium mt-3 text-center text-blue-500";
+
+            const formData = new FormData();
+            formData.append("email", email);
+
+            try {
+                const response = await fetch("/request-otp", { method: "POST", body: formData });
+                if (response.ok) {
+                    statusText.innerText = "✅ OTP sent to your email!";
+                    statusText.className = "text-sm font-medium mt-3 text-center text-green-600";
+                } else {
+                    statusText.innerText = "❌ Error sending OTP.";
+                    statusText.className = "text-sm font-medium mt-3 text-center text-red-600";
+                }
+            } catch (error) {
+                statusText.innerText = "Network error.";
+                statusText.className = "text-sm font-medium mt-3 text-center text-red-600";
+            }
+        }
+    </script>
+</body>
+</html>

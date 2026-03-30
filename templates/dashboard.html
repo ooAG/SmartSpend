@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SmartSpend Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex flex-col">
+
+<nav class="bg-blue-700 p-4 shadow-lg text-white">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
+        <h1 class="text-2xl font-extrabold tracking-tight">💳 SmartSpend</h1>
+        <div class="space-x-1 flex bg-blue-800 p-1 rounded-lg">
+            <button onclick="switchTab('home')" id="tab-home" class="px-4 py-2 rounded-md bg-white text-blue-700 font-bold shadow transition">Dashboard</button>
+            <button onclick="switchTab('analytics')" id="tab-analytics" class="px-4 py-2 rounded-md text-blue-100 hover:bg-blue-600 font-medium transition">Analytics</button>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-sm font-medium bg-blue-800 px-3 py-1 rounded-full border border-blue-600">👤 {{ user.email }}</span>
+            <a href="/logout" class="text-sm text-red-200 hover:text-white font-bold transition"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="max-w-6xl mx-auto mt-6 p-4 w-full flex-grow">
+    
+    <div id="view-home" class="block space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center">
+                <p class="text-sm text-gray-500 font-semibold uppercase tracking-wide">Net Balance</p>
+                <h2 class="text-3xl font-bold {% if net_balance >= 0 %}text-blue-600{% else %}text-red-600{% endif %}">₹{{ "%.2f"|format(net_balance) }}</h2>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center">
+                <p class="text-sm text-gray-500 font-semibold uppercase tracking-wide">Total Income</p>
+                <h2 class="text-2xl font-bold text-green-500">₹{{ "%.2f"|format(total_income) }}</h2>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center">
+                <p class="text-sm text-gray-500 font-semibold uppercase tracking-wide">Total Expense</p>
+                <h2 class="text-2xl font-bold text-red-500">₹{{ "%.2f"|format(total_expense) }}</h2>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">📱 Log Transaction</h2>
+                        <button onclick="openManualEntry()" class="text-sm text-blue-600 font-bold hover:underline">+ Add Manually</button>
+                    </div>
+                    
+                    <form id="smsForm" class="flex gap-4 mb-6" onsubmit="parseSMS(event)">
+                        <input type="text" id="smsText" placeholder="Paste bank SMS here..." class="flex-1 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        <button type="submit" id="parseBtn" class="bg-gray-900 text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 shadow">Parse SMS</button>
+                    </form>
+
+                    <div class="pt-4 border-t border-gray-100">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase mb-3">📄 Bulk Import (Excel Statement)</h3>
+                        <div class="flex items-center gap-4">
+                            <input type="file" id="excelFile" accept=".xls,.xlsx" class="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            <button onclick="uploadExcel()" id="uploadBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:bg-blue-700 transition">Upload Excel</button>
+                        </div>
+                    </div>
+
+                    <div id="editorSection" class="hidden mt-6 pt-6 border-t border-gray-100">
+                        <form id="saveForm" class="space-y-4" onsubmit="saveTransaction(event)">
+                            <input type="hidden" id="editTxnId" value=""> 
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="block text-xs font-bold text-gray-500 uppercase">Amount</label><input type="number" step="0.01" id="editAmount" required class="mt-1 w-full border border-gray-200 rounded-lg p-2"></div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase">Type</label>
+                                    <select id="editType" class="mt-1 w-full border border-gray-200 rounded-lg p-2">
+                                        <option value="debit">Expense</option>
+                                        <option value="credit">Income</option>
+                                    </select>
+                                </div>
+                                <div><label class="block text-xs font-bold text-gray-500 uppercase">Merchant</label><input type="text" id="editMerchant" required class="mt-1 w-full border border-gray-200 rounded-lg p-2"></div>
+                                <div><label class="block text-xs font-bold text-gray-500 uppercase">Category</label><input type="text" id="editCategory" required class="mt-1 w-full border border-gray-200 rounded-lg p-2"></div>
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-bold text-gray-500 uppercase">Transaction Date</label>
+                                    <input type="date" id="editDate" required class="mt-1 w-full border border-gray-200 rounded-lg p-2">
+                                </div>
+                            </div>
+                            <div><label class="block text-xs font-bold text-gray-500 uppercase">Notes</label><input type="text" id="editNotes" placeholder="Optional notes" class="mt-1 w-full border border-gray-200 rounded-lg p-2"></div>
+                            <div class="flex space-x-3 pt-2">
+                                <button type="button" onclick="cancelEdit()" class="w-1/3 bg-gray-100 text-gray-600 p-2 rounded-lg hover:bg-gray-200 font-medium">Cancel</button>
+                                <button type="submit" class="w-2/3 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 shadow-md font-bold">Save Data</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="flex flex-col space-y-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex bg-gray-200 p-1 rounded-lg">
+                            <a href="/dashboard?view=all&month={{current_month}}&year={{current_year}}" class="px-3 py-1 rounded-md text-[10px] font-bold {% if current_view == 'all' %}bg-white shadow text-blue-600{% else %}text-gray-600{% endif %}">All</a>
+                            <a href="/dashboard?view=debit&month={{current_month}}&year={{current_year}}" class="px-3 py-1 rounded-md text-[10px] font-bold {% if current_view == 'debit' %}bg-white shadow text-red-600{% else %}text-gray-600{% endif %}">Expenses</a>
+                            <a href="/dashboard?view=credit&month={{current_month}}&year={{current_year}}" class="px-3 py-1 rounded-md text-[10px] font-bold {% if current_view == 'credit' %}bg-white shadow text-green-600{% else %}text-gray-600{% endif %}">Income</a>
+                        </div>
+                        <form action="/dashboard" method="get" class="flex flex-wrap items-center gap-2 text-[10px]">
+                            <input type="hidden" name="view" value="{{ current_view }}">
+                            <select name="year" onchange="this.form.submit()" class="border rounded p-1 font-bold">
+                                {% for y in range(2023, 2028) %}
+                                <option value="{{ y }}" {% if current_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="month" onchange="this.form.submit()" class="border rounded p-1 font-bold text-blue-700">
+                                <option value="0" {% if current_month == 0 %}selected{% endif %}>All Months</option>
+                                {% set months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] %}
+                                {% for m in range(1, 13) %}
+                                <option value="{{ m }}" {% if current_month == m %}selected{% endif %}>{{ months[m-1] }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="sort_by" onchange="this.form.submit()" class="border rounded p-1">
+                                <option value="created_at" {% if current_sort == 'created_at' %}selected{% endif %}>Date</option>
+                                <option value="amount" {% if current_sort == 'amount' %}selected{% endif %}>Amount</option>
+                            </select>
+                            <select name="order" onchange="this.form.submit()" class="border rounded p-1">
+                                <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Desc</option>
+                                <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Asc</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <tbody id="txTableBody">
+                            {% for t in transactions %}
+                            <tr class="border-b border-gray-50 hover:bg-gray-50 transition group">
+                                <td class="p-4 font-semibold">
+                                    {{ t.merchant }}<br>
+                                    <span class="text-[10px] text-gray-400 font-bold">{{ t.created_at.strftime('%d %b %Y') }}</span>
+                                </td>
+                                <td class="p-4">
+                                    <span class="{% if t.category == 'Transfers' %}bg-purple-50 text-purple-700{% else %}bg-blue-50 text-blue-700{% endif %} text-[10px] px-2 py-1 rounded font-bold uppercase">
+                                        {{ t.category }}
+                                    </span>
+                                </td>
+                                <td class="p-4 font-bold text-right {% if t.type == 'credit' %}text-green-600{% else %}text-gray-900{% endif %}">
+                                    {% if t.type == 'credit' %}+{% else %}-{% endif %}₹{{ "%.2f"|format(t.amount) }}
+                                </td>
+                                <td class="p-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="triggerEdit('{{ t.id }}', '{{ t.amount }}', '{{ t.type }}', '{{ t.merchant }}', '{{ t.category }}', '{{ t.notes }}', '{{ t.created_at.strftime('%Y-%m-%d') }}')" class="text-blue-500 mx-2"><i class="fas fa-edit"></i></button>
+                                    <button onclick="deleteTransaction('{{ t.id }}')" class="text-red-500"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="p-10 text-center text-gray-400">No records found for this period.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">⏰ Upcoming Bills</h3>
+                    <div class="space-y-3 mb-4">
+                        {% for r in reminders %}
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
+                            <div><p class="font-bold text-sm">{{ r.title }}</p><p class="text-[10px] text-gray-500">{{ r.due_date }}</p></div>
+                            <div class="text-right"><span class="font-bold text-red-500 block">₹{{ r.amount }}</span><button onclick="deleteReminder('{{ r.id }}')" class="text-[10px] text-gray-400 hover:text-red-500">Mark Paid</button></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <form onsubmit="addReminder(event)" class="border-t pt-4 space-y-2">
+                        <input type="text" id="remTitle" placeholder="Bill Title" required class="w-full text-xs border rounded p-2">
+                        <div class="flex gap-2"><input type="number" id="remAmount" placeholder="Amount" required class="w-1/2 text-xs border rounded p-2"><input type="date" id="remDate" required class="w-1/2 text-xs border rounded p-2"></div>
+                        <button type="submit" class="w-full bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-black transition">+ Add</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-analytics" class="hidden">
+        <h2 class="text-2xl font-extrabold text-gray-800 mb-6 text-center">Visual Analysis</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl border"><h3 class="font-bold text-center mb-4">Expenses</h3><canvas id="expenseChart"></canvas></div>
+            <div class="bg-white p-6 rounded-2xl border"><h3 class="font-bold text-center mb-4">Income</h3><canvas id="incomeChart"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Utility to get today's date in local YYYY-MM-DD format
+    function getTodayStr() {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000; 
+        return (new Date(now - offset)).toISOString().split('T')[0];
+    }
+
+    function switchTab(tab) {
+        document.getElementById('view-home').classList.add('hidden');
+        document.getElementById('view-analytics').classList.add('hidden');
+        document.getElementById('tab-home').className = "px-4 py-2 rounded-md text-blue-100 font-medium transition";
+        document.getElementById('tab-analytics').className = "px-4 py-2 rounded-md text-blue-100 font-medium transition";
+        document.getElementById(`view-${tab}`).classList.remove('hidden');
+        document.getElementById(`tab-${tab}`).className = "px-4 py-2 rounded-md bg-white text-blue-700 font-bold shadow";
+        if (tab === 'analytics') loadChart();
+    }
+
+    function openManualEntry() {
+        document.getElementById('editTxnId').value = "";
+        document.getElementById('editAmount').value = "";
+        document.getElementById('editMerchant').value = "";
+        document.getElementById('editCategory').value = "General";
+        document.getElementById('editNotes').value = "";
+        document.getElementById('editDate').value = getTodayStr(); // Defaults to Today
+        document.getElementById('editorSection').classList.remove('hidden');
+    }
+
+    function triggerEdit(id, amount, type, merchant, category, notes, rawDate) {
+        document.getElementById('editTxnId').value = id;
+        document.getElementById('editAmount').value = amount;
+        document.getElementById('editType').value = type;
+        document.getElementById('editMerchant').value = merchant;
+        document.getElementById('editCategory').value = category;
+        document.getElementById('editNotes').value = notes !== 'None' ? notes : "";
+        if (rawDate) document.getElementById('editDate').value = rawDate;
+        document.getElementById('editorSection').classList.remove('hidden');
+    }
+
+    function cancelEdit() { document.getElementById('editorSection').classList.add('hidden'); }
+
+    async function parseSMS(event) {
+        event.preventDefault();
+        const btn = document.getElementById('parseBtn'); btn.innerText = "...";
+        const formData = new FormData(); formData.append("text", document.getElementById('smsText').value);
+        try {
+            const res = await fetch("/api/parse_sms", { method: "POST", body: formData });
+            const data = await res.json();
+            triggerEdit("", data.amount, data.type, data.merchant, data.category, "", getTodayStr());
+        } catch(e) { alert("SMS Parsing Failed"); }
+        btn.innerText = "Parse SMS";
+    }
+
+    async function uploadExcel() {
+        const fileInput = document.getElementById('excelFile');
+        if (!fileInput.files[0]) return alert("Please select an Excel file first.");
+        
+        const btn = document.getElementById('uploadBtn');
+        btn.innerText = "Processing...";
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        try {
+            const res = await fetch("/api/upload_statement", { method: "POST", body: formData });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Success! Imported ${data.count} transactions.`);
+                window.location.reload();
+            } else {
+                alert("Processing failed: " + (data.detail || "Unknown error"));
+            }
+        } catch (e) {
+            alert("Upload failed.");
+        } finally {
+            btn.innerText = "Upload Excel";
+            btn.disabled = false;
+        }
+    }
+
+    async function saveTransaction(event) {
+        event.preventDefault();
+        const fd = new FormData();
+        fd.append("amount", document.getElementById('editAmount').value);
+        fd.append("type", document.getElementById('editType').value);
+        fd.append("merchant", document.getElementById('editMerchant').value);
+        fd.append("category", document.getElementById('editCategory').value);
+        fd.append("notes", document.getElementById('editNotes').value);
+        fd.append("txn_date", document.getElementById('editDate').value);
+        
+        const txnId = document.getElementById('editTxnId').value;
+        if(txnId) fd.append("txn_id", txnId);
+        await fetch("/api/save_transaction", { method: "POST", body: fd });
+        window.location.reload(); 
+    }
+
+    async function deleteTransaction(id) {
+        if(!confirm("Delete?")) return;
+        const fd = new FormData(); fd.append("txn_id", id);
+        await fetch("/api/delete_transaction", { method: "POST", body: fd });
+        window.location.reload();
+    }
+
+    async function addReminder(event) {
+        event.preventDefault();
+        const fd = new FormData();
+        fd.append("title", document.getElementById('remTitle').value);
+        fd.append("amount", document.getElementById('remAmount').value);
+        fd.append("due_date", document.getElementById('remDate').value);
+        await fetch("/api/add_reminder", { method: "POST", body: fd });
+        window.location.reload();
+    }
+
+    async function deleteReminder(id) {
+        const fd = new FormData(); fd.append("rem_id", id);
+        await fetch("/api/delete_reminder", { method: "POST", body: fd });
+        window.location.reload();
+    }
+
+    let expenseChart = null; let incomeChart = null;
+    async function loadChart() {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const m = urlParams.get('month') || 0;
+            const y = urlParams.get('year') || new Date().getFullYear();
+            const res = await fetch(`/api/analytics?month=${m}&year=${y}`);
+            const data = await res.json();
+            
+            const ctxExp = document.getElementById('expenseChart').getContext('2d');
+            const ctxInc = document.getElementById('incomeChart').getContext('2d');
+            if (expenseChart) expenseChart.destroy(); if (incomeChart) incomeChart.destroy();
+
+            const options = {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                let sum = 0;
+                                ctx.chart.data.datasets[0].data.forEach(d => sum += d);
+                                let p = sum > 0 ? (ctx.raw * 100 / sum).toFixed(1) + "%" : "0%";
+                                return ctx.label + ': ₹' + ctx.raw + ' (' + p + ')';
+                            }
+                        }
+                    }
+                }
+            };
+            expenseChart = new Chart(ctxExp, { type: 'doughnut', data: { labels: data.expenses.labels, datasets: [{ data: data.expenses.values, backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#eab308'] }] }, options });
+            incomeChart = new Chart(ctxInc, { type: 'doughnut', data: { labels: data.incomes.labels, datasets: [{ data: data.incomes.values, backgroundColor: ['#10b981', '#14b8a6', '#06b6d4', '#0ea5e9'] }] }, options });
+        } catch (e) { console.error(e); }
+    }
+</script>
+</body>
+</html>
